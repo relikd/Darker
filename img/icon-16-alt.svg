@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<clipPath id="c"><circle cx="512" cy="512" r="512"/></clipPath>
+<circle cx="512" cy="512" r="512" fill="#740"/>
+<path clip-path="url(#c)" fill="#C90" d="
+    M-999,-999H9999V9999H-999z
+    M250,412 a450,450,1,0,0,900,0 a450,450,1,0,0,-900,0z"/>
+</svg>
