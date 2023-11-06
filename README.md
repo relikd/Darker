@@ -19,6 +19,9 @@ Alternatively, you can compile Darker from source by running `make`.
 
 Or call the script directly (`swift src/main.swift`) without building an app bundle.
 
+**Note:** If you are using macOS 10.14.3 or lower, you will need the Swift 5 Runtime Support.
+You can download either from [Apple](https://developer.apple.com/download/all/) (developer account required) or use the [dmg](Swift_5_Runtime_Support_for_Command_Line_Tools.dmg) provided with this project.
+
 
 ## FAQ
 
