@@ -1,43 +1,68 @@
-# usage: make [CONFIG=debug|release]
+APP_NAME := Darker
 
+# usage: make [CONFIG=debug|release]
 ifeq ($(CONFIG), debug)
-    CFLAGS=-Onone -g
+	CFLAGS=-Onone -g
 else
-    CFLAGS=-O
+	CFLAGS=-O
 endif
 
 PLIST=$(shell grep -A1 $(1) src/Info.plist | tail -1 | cut -d'>' -f2 | cut -d'<' -f1)
+HAS_SIGN_IDENTITY=$(shell security find-identity -v -p codesigning | grep -q "Apple Development" && echo 1 || echo 0)
 
-
-Darker.app: SDK_PATH=$(shell xcrun --show-sdk-path --sdk macosx)
-Darker.app: src/*
-	@mkdir -p Darker.app/Contents/MacOS/
-	# compile x64
-	swiftc ${CFLAGS} src/main.swift -target x86_64-apple-macos10.10 -emit-executable -sdk ${SDK_PATH} -o bin_x64
-	# compile arm64
-	swiftc ${CFLAGS} src/main.swift -target arm64-apple-macos10.10 -emit-executable -sdk ${SDK_PATH} -o bin_arm64
-	# make universal bundle
-	lipo -create bin_x64 bin_arm64 -o Darker.app/Contents/MacOS/Darker
-	@rm bin_x64 bin_arm64
-	@echo 'APPL????' > Darker.app/Contents/PkgInfo
-	@mkdir -p Darker.app/Contents/Resources/
-	@cp src/AppIcon.icns Darker.app/Contents/Resources/AppIcon.icns
-	@cp src/Info.plist Darker.app/Contents/Info.plist
-	@touch Darker.app
-
-.PHONY: sign
-sign: Darker.app
-	codesign -v -s 'Apple Development' --options=runtime --timestamp Darker.app
-	@echo
-	@echo 'Verify Signature...'
-	@echo
-	codesign -dvv Darker.app
-	@echo
-	codesign -vvv --deep --strict Darker.app
-	@echo
-	spctl -vvv --assess --type exec Darker.app
 
 .PHONY: release
 release: VERSION=$(call PLIST,CFBundleShortVersionString)
-release: Darker.app
-	tar -czf "Darker_v${VERSION}.tar.gz" Darker.app
+release: ${APP_NAME}.app
+	@echo
+	@echo ... Zip ...
+	@rm -rf "${APP_NAME}_${VERSION}.zip"
+	zip "${APP_NAME}_${VERSION}.zip" -qr "${APP_NAME}.app"
+
+
+${APP_NAME}.app: OS_VER=$(call PLIST,LSMinimumSystemVersion)
+${APP_NAME}.app: SDK_PATH=$(shell xcrun --show-sdk-path --sdk macosx)
+${APP_NAME}.app: src/* img/AppIcon.icns $(wildcard res/*)
+	@mkdir -p ${APP_NAME}.app/Contents/MacOS/
+	@echo
+	@echo ... Build Executable ...
+	swiftc ${CFLAGS} src/main.swift -target x86_64-apple-macos${OS_VER} -emit-executable -sdk "${SDK_PATH}" -o bin_x64
+	swiftc ${CFLAGS} src/main.swift -target arm64-apple-macos${OS_VER} -emit-executable -sdk "${SDK_PATH}" -o bin_arm64
+	lipo -create bin_x64 bin_arm64 -o "${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+	@rm bin_x64 bin_arm64
+	@echo
+	@echo ... Generate Meta Data ...
+	echo 'APPL????' > "${APP_NAME}.app/Contents/PkgInfo"
+	cp src/Info.plist "${APP_NAME}.app/Contents/Info.plist"
+	@echo
+	@echo ... Copy Other Resources ...
+	@mkdir -p "${APP_NAME}.app/Contents/Resources/"
+ifneq ($(wildcard res/*),)
+	rsync -a res/ "${APP_NAME}.app/Contents/Resources/" --exclude .DS_Store --del
+endif
+	cp img/AppIcon.icns "${APP_NAME}.app/Contents/Resources/"
+	@echo
+	@echo ... Final Touches ...
+	@find "${APP_NAME}.app" -name .DS_Store -delete
+	touch "${APP_NAME}.app"
+	@echo
+	@echo ... Code Sign ...
+ifeq ($(HAS_SIGN_IDENTITY),1)
+	-codesign -v -s 'Apple Development' --options=runtime --timestamp "${APP_NAME}.app"
+else
+	-codesign -v -s - "${APP_NAME}.app"
+endif
+	@echo
+	@echo ... Verify Signature ...
+	codesign -dvv "${APP_NAME}.app"
+	@echo
+	codesign -vvv --strict "${APP_NAME}.app"
+ifeq ($(HAS_SIGN_IDENTITY),1)
+	@echo
+	-spctl -vvv --assess --type exec "${APP_NAME}.app"
+endif
+
+
+.PHONY: clean
+clean:
+	rm -rf "${APP_NAME}.app" bin_x64 bin_arm64
